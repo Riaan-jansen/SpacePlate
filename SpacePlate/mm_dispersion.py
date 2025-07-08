@@ -1,7 +1,9 @@
 '''
 Calculates the dispersion relation k0 against kx against transmission
 coefficient. Sweeping over angle.
-rewritten functions for calculating T to loop over kx as well
+rewritten functions for calculating T to loop over kx as well.\n
+- T_dispersion() calculates the coefficients given arrays KX K0.\n
+- dispersion_plot() plots k0 - kx mapping T with scatter points.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -99,8 +101,11 @@ def T_dispersion(kx, k, modes):
     T = k * 4 * q_plus_00 * q_minus_00 / (d**2 * kz_00 * D)
     return T
 
+
 def dispersion_map(KX, K0, modes, log=False):
-    '''input: KX: array, k: array, modes: list of tuple, optional: log: bool.
+    '''
+    obsolete/needs work
+    input: KX: array, k: array, modes: list of tuple, optional: log: bool.
     output: plots colourmap of KX-frequency with transmission coeffs as colour.'''
 
     Z = T_dispersion(KX, K0, modes)
@@ -123,25 +128,30 @@ def dispersion_map(KX, K0, modes, log=False):
     # plt.yticks(frequency*2*np.pi/c, ['%d' % (val/1000) for val in frequency])
     plt.show()
 
+
+def dispersion_plot(KX, K0, modes):
+    '''plots using scatter points. accounts for uneven spacing in array
+    with sin(t) dependency.'''
+
+    Z = T_dispersion(KX, K0, modes)
+    Z = np.abs(Z)
+    Z_norm = (Z - np.min(Z)) / (np.max(Z) - np.min(Z))
+
+    plt.scatter(KX, K0, s=1, c=Z_norm, cmap='jet')
+    plt.colorbar(label='Transmission coeff')
+    plt.title(f'Transmission for m_max={max([max(m) for m in modes])}')
+    plt.xlabel('$k_x$ (1/mm)')
+    plt.ylabel('Frequency (kHz)')
+    plt.yticks(frequency*2*np.pi/c, ['%d' % (val/1000) for val in frequency])
+    plt.xlim(right=0.4)
+    plt.show()
+
 size = 3
-# m_list = [(x,x) for x in range(size)] + [(0,x) for x in range(size)] + [(x,0) for x in range(size)]
 m_list = [(m1, m2) for m1 in range(-size+1, size) for m2 in range(-size+1, size)]
 m_list = list(dict.fromkeys(m_list))
 
-# m_list=[(0,0), (1,1), (2,2)]
+dispersion_plot(KX, K0, m_list)
 # dispersion_map(KX, K0, m_list, log=False)
-
-Z = T_dispersion(KX, K0, m_list)
-Z = np.abs(Z)
-Z_norm = (Z - np.min(Z)) / (np.max(Z) - np.min(Z))
-
-plt.scatter(KX, K0, s=1, c=Z_norm, cmap='jet')
-plt.colorbar(label='Transmission coeff')
-plt.ylabel('k0')
-plt.xlabel('kx')
-plt.xlim(right=0.4)
-plt.show()
-
 
 # x = np.linspace(0, 1, N*2)
 # y = np.where(x == 0, np.pi * a**2, 2*np.pi * a * jv(1, a * x) / x)

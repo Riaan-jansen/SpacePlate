@@ -1,5 +1,9 @@
 '''
-modal matching code from Murray thesis
+modal matching code from Murray thesis. Figures 5.3-5.8.
+Single and double fishnet cases.\n
+- T() is single\n
+- T_DF() is double\n
+- colourmap() and plot1D() take DF=bool
 '''
 
 # result - colourmap frequency-depth+colour=transmission
