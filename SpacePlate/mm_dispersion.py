@@ -1,9 +1,10 @@
 '''
-rewritting functions for calculating T to loop over kx as well
+Calculates the dispersion relation k0 against kx against transmission
+coefficient. Sweeping over angle.
+rewritten functions for calculating T to loop over kx as well
 '''
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.integrate import dblquad
 from scipy.special import jv, j0, j1  # bessel function 1st kind
 import matplotlib.colors as mcolors
 
@@ -21,6 +22,7 @@ f1 = 10000; f2 = 40000  # (Hz)
 frequency = np.linspace(f1, f2, 8)  # for plotting
 ky = 0  # k should be in (1/mm)
 
+# defines angle and frequency to sweep over
 thetas = np.linspace(0, 89.9*np.pi/180, N)
 k0 = 2*np.pi/c * np.linspace(f1, f2, N)
 
