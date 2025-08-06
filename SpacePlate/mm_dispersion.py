@@ -13,16 +13,16 @@ import matplotlib.colors as mcolors
 from scipy.integrate import dblquad
 
 # hardcoded variables as defined in the paper
-d = 6.75  # pitch (mm)
+d = 6.7  # pitch (mm)
 # a = np.sqrt(np.pi * (0.0024/2)**2)  # so circle and square have same area
-a = 1.25
+a = 1.3
 rho = 1.225E-9  # air density (E-9kg/mmc)
 rho_prime = rho
 c = 343000  # (mm/s) STANDARD IS 343m/s but end corrections reduce
-h = 1.6  # max pipe depth
-hg = 18.9
+h = 1.5  # max pipe depth
+hg = 19.6
 
-N = 400  # to keep arrays same size
+N = 1600  # to keep arrays same size
 f1 = 100; f2 = 40000  # (Hz)
 frequency = np.linspace(f1, f2, 9)  # for plotting
 ky = 0  # k should be in (1/mm)

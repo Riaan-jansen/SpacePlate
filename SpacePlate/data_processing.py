@@ -20,8 +20,8 @@ dt = 3.2e-6
 nt = 10000
 
 x0 = 0
-x1 = 470
-dx = 6.75
+x1 = 510
+dx = 6.7
 nx = int((x1 - x0) / dx) + 1
 
 t = np.arange(0,nt)*dt
@@ -42,8 +42,8 @@ def cleanup(filename, backfile):
     noise = back[:,0,:]
 
     # mean subtraction
-    temp = temp - np.mean(temp, axis=0)
-    noise = noise - np.mean(noise, axis=0)
+    temp = temp + np.mean(temp, axis=0)
+    noise = noise + np.mean(noise, axis=0)
 
     # fft 2d
     fft_temp = np.fft.fftshift(np.fft.fft2(temp))
@@ -76,28 +76,58 @@ def plot1Dfft(filename):
     # t = np.arange(ps.noSamples)*(ps.timebase-2)/(125*1e6)
     
     # time -> frequency values for y axis
-    freq_time = np.fft.fftshift(np.fft.rfftfreq(len(t), d=dt))
+    freq_time = np.fft.fftshift(np.fft.fftfreq(len(t), d=dt))
     
     # fft of the data f(t) -> F(w)
-    fft_temp = np.fft.fftshift(np.fft.rfft(temp, axis=0), axes=0)
+    fft_temp = np.fft.fftshift(np.fft.fft(temp, axis=0), axes=0)
     fft_temp = np.abs(fft_temp)**2
     
     # limits to frequency plotting
     y1 = 0
     y2 = 40000
 
-    clipped_temp = np.clip(fft_temp, 0, 2000)
+    clipped_temp = np.clip(fft_temp, 0, 5000)
+    # clipped_temp = fft_temp
     
-    plt.pcolormesh(x, freq_time, clipped_temp, shading='nearest')
+    plt.pcolormesh(x, freq_time, clipped_temp, shading='nearest', cmap='plasma')
     plt.ylim(bottom=y1, top=y2)
     plt.xlabel('x (m)')
     plt.ylabel('frequency (Hz)')
-    plt.title('2D freq - time')
+    plt.title('2D freq - space')
     plt.colorbar(label='Amplitude')
     plt.show()
+
+
+def plot1Damp(filename, backfile, plot=False):
+    '''to plot transmission against frequency for one x. Exported to comparision
+    graphs to comapre against theory and comsol.'''
+    # load data and transpose: columns -> rows
+    fft_temp = cleanup(filename, backfile)
+    fft_temp = np.abs(fft_temp)**2
+
+    # time -> frequency values for y axis
+    freq_time = np.fft.fftshift(np.fft.fftfreq(len(t), d=dt))
+    threshold_freq = (10000, 40000)
+    index1 = np.searchsorted(freq_time, threshold_freq[0], side='left')
+    index2 = np.searchsorted(freq_time, threshold_freq[1], side='right')
     
-    plt.plot(freq_time[::-1], clipped_temp[::-1,0])
-    plt.show()
+    freq_time = freq_time[index1:index2]
+
+    clipped_temp = np.clip(fft_temp, 0, 1)
+    # clipped_temp = fft_temp
+
+    x0 = 250
+    dx = 6.75
+    x_idx = int(x0/dx)
+    if plot:
+        plt.plot(freq_time, clipped_temp[x_idx,index1:index2])
+        plt.ylabel('Transmission Amplitude')
+        plt.xlabel('frequency (Hz)')
+        plt.title('Amplitude - frequency @ normal incidence')
+        plt.grid()
+        plt.show()
+
+    return freq_time, clipped_temp[x_idx,index1:index2]
 
     
 def plot2Dfft(filename):
@@ -136,10 +166,9 @@ def plot2Dfft(filename):
     plt.show()
 
 
-
 def plot2Dfft_clean(filename, backfile):
 
-    a = 0.008  # lattice constant (pitch)
+    a = 6.7  # lattice constant (pitch)
     k_bz = pi / a
 
     # time -> frequency values for y axis
@@ -169,7 +198,6 @@ def plot2Dfft_clean(filename, backfile):
     plt.title('2D freq - k-space')
     plt.colorbar(label='Amplitude')
     plt.show()
-
 
 
 def plot2Dphase(filename, backfile):
@@ -240,21 +268,19 @@ def find_freq(filename, backfile):
     plt.show()
     
 
-def plot1Dphase(filename, backfile, freq=18500):
+def plot1Dphase(filename, backfile, freq=18500, angle=False):
     '''argument against space @ one frequency'''
-    
     data = np.load(filename)
     temp = data[:,0,:]
     # fft_temp = np.fft.fftshift(np.fft.fft2(temp))
-    fft_temp = np.fft.fftshift(np.fft.fft(temp, axis=0))#, axes=0)
-    # fft_temp = cleanup(filename, backfile)
+    fft_temp = np.fft.fftshift(np.fft.fft(temp, axis=1), axes=1)
     arg_data = np.angle(fft_temp)
     
     noise = np.load(backfile)
     temp_noise = noise[:,0,:]
     # fft_noise = np.fft.fftshift(np.fft.fft2(temp_noise))
-    fft_noise = np.fft.fftshift(np.fft.fft(temp_noise, axis=0))#, axes=0)
-    arg_noise = np.angle(fft_noise)    
+    fft_noise = np.fft.fftshift(np.fft.fft(temp_noise, axis=1), axes=1)
+    arg_noise = np.angle(fft_noise)
     
     # time -> frequency values for y axis
     freq_time = np.fft.fftshift(np.fft.fftfreq(len(t), d=dt))  
@@ -264,11 +290,9 @@ def plot1Dphase(filename, backfile, freq=18500):
     # frequency limits
     y1 = 0; y2 = 40000
     x = np.arange(x0,x1+dx,dx)
-
-    x_sft = x - 250  # shift to center on theta=0
     
-    d_sp = 18.9 + 1.6*2
-    D = 250 + d_sp + 20  # to plate, sp, plate to mic
+    d_sp = 19.6 + 1.5*2
+    D = 180 + d_sp + 25  # to plate, sp, plate to mic
     c0 = 343000
     
     # plot slice along one frequency
@@ -277,45 +301,58 @@ def plot1Dphase(filename, backfile, freq=18500):
     slice_noise = np.unwrap(arg_noise[:,idx], axis=0)
 
     # amplitude
+    fft_clean = np.divide(fft_temp, fft_noise)
+
     t_data = np.abs(fft_temp)**2
     t_noise = np.abs(fft_noise)**2
-    plt.plot(x_sft, t_data[:,idx], label='sample')
-    plt.plot(x_sft, t_noise[:,idx], label='no sample')
-    plt.ylabel('Fourier amplitude (abs(t)^2)')
-    plt.xlabel('x (shifted) (mm)')
-    plt.grid()
-    plt.legend()
-    plt.show()
+    # t_clean = np.abs(fft_clean)**2
 
-    # phase - space
-    plt.plot(x_sft, slice_data*180/pi, label='sample')
-    plt.plot(x_sft, slice_noise*180/pi, label='no sample')
-    plt.title(f'Phase - space @ {freq} Hz')
-    plt.xlabel('x (mm)')
-    plt.ylabel('Phase (deg)')
+    # plt.plot(x_sft, t_data[:,idx], label='sample')
+    # plt.plot(x_sft, t_noise[:,idx], label='no sample')
+    # plt.plot(x_sft, t_clean[:,idx], label ='sample/no sample')
 
-    # phase - angle
-    theta = (np.arctan(x_sft/D))
-    # plt.plot(theta*180/pi, slice_data*180/pi, label='sample')
-    # plt.plot(theta*180/pi, slice_noise*180/pi, label='no sample')
+    # plt.ylabel('Fourier amplitude (abs(t)^2)')
+    # plt.xlabel('x (shifted) (mm)')
+    # plt.grid()
+    # plt.legend()
+    # plt.show()
 
-    # plt.xlabel('Angle (deg)')
-    # plt.ylabel('Phase (deg)')
-    
+    phase_free = (slice_noise-np.max(slice_noise))
+    phase_sp = (slice_data-np.max(slice_data))
+
+    x_idx = [i for i, x in enumerate(phase_free) if x == 0]
+    x = x - x[x_idx]  # shift to center on theta=0
+
+    theta = (np.arctan(x/D))
+    if angle:
+        # phase - angle
+        plt.plot(theta*180/pi, phase_sp*180/pi, label='sample')
+        plt.plot(theta*180/pi, phase_free*180/pi, label='no sample')
+        plt.title(f'Phase - angle @ {freq} Hz')
+        plt.xlabel('Angle (deg)')
+        plt.ylabel('Phase (deg)')
+    else:
+        # phase - space
+        plt.plot(x, phase_sp, label='sample')
+        plt.plot(x, phase_free, label='no sample')
+        plt.title(f'Phase - space @ {freq} Hz')
+        plt.xlabel('x (mm)')
+        plt.ylabel('Phase (rad)')
+
     # show
-    plt.title(f'Phase - angle @ {freq} Hz')
     plt.legend()
     plt.grid()
     plt.show()
     
     # from space squeezing optics paper
-    phase_diff = slice_data - slice_noise
-    
+    # phase_diff = slice_data - slice_noise
+
+    phase_diff = (slice_data-np.max(slice_data, axis=0)) - (slice_noise-np.max(slice_noise, axis=0))
+
     d_eff = phase_diff / (2*pi * freq * np.cos(theta) / c0)
     
-    C = np.max(d_eff) / d_sp
+    C = np.mean(d_eff) / d_sp
     print(f'compression factor = {C}')
-
 
 ###############################################################################
 ################################ calling ######################################
@@ -323,9 +360,14 @@ def plot1Dphase(filename, backfile, freq=18500):
 # filename = r'scan_1d_sample.npy'
 # backfile = r'scan_1d_nosample.npy'
 
-filename = r'scan_sample11.npy'
-backfile = r'scan_nosample11.npy'
+# filename = r'scan_sample11.npy'
+# backfile = r'scan_nosample11.npy'
 
-plot1Dphase(filename, backfile, freq=10000)
+filename = r'scan_sample18.npy'
+backfile = r'scan_nosample18.npy'
 
+# plot2Dfft_clean(filename, backfile)
+# plot1Damp(filename, backfile, plot=True)
+# plot1Dfft(filename)
+plot1Dphase(filename, backfile, freq=27500)
 # find_freq(filename, backfile)

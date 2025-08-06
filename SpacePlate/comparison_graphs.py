@@ -4,7 +4,7 @@ from modal_match import T, T_DF, T3, T2, T4
 from mm_dispersion import T_dispersion
 
 c = 343000
-h = 1.6
+h = 1.5
 f1 = 10000
 f2 = 40000
 
@@ -196,21 +196,23 @@ def plot_fine_sweep(filename2):
     plt.grid()
     plt.show()
 
-def plot_comparison(filename):
+def plot_comparison(filename, expfile, backfile):
 
     p_data, p_cols = read_data(filename)
+    p_freqs = [x[0] for x in p_data]
+    p_eval = [x[1] for x in p_data]
         
-    p_freqs = []
-    for part in p_cols[1:]:
-        if 'freq=' in part:
-            freq = float(part.split('freq=')[1].split(' ')[0])
-            p_freqs.append(freq/1000)
+    # p_freqs = []
+    # for part in p_cols[1:]:
+    #     if 'freq=' in part:
+    #         freq = float(part.split('freq=')[1].split(' ')[0])
+    #         p_freqs.append(freq/1000)
 
-    p_eval = p_data[0]
+    # p_eval = p_data[0]
 
-    N = len(p_freqs)
+    N = 2000 # len(p_freqs)
     k = 2*np.pi/c * np.linspace(f1, f2, N)
-    size = 2
+    size = 3
 
     m = [(m1, m2) for m1 in range(-size, size+1) for m2 in range(-size, size+1)]
     m = list(dict.fromkeys(m))
@@ -219,16 +221,21 @@ def plot_comparison(filename):
     Z = np.abs(Z)**2
     Z = (Z - np.min(Z)) / (np.max(Z) - np.min(Z))
 
-    plt.plot(np.linspace(f1, f2, N)/1000, Z, label='analytical')
-    plt.plot(p_freqs, p_eval[1:], label='numerical', ls='--')
+    from data_processing import plot1Damp
+    freq, amp = plot1Damp(expfile, backfile)
 
-    plt.title(f'Analytical vs Numerical Model')
+    plt.plot(np.linspace(f1, f2, N), Z, label='analytical')
+    # plt.plot(p_freqs, p_eval[1:], label='numerical', ls='--')  # for parametric sweep data
+    plt.plot(p_freqs, p_eval, label='numerical', ls='--')
+
+    plt.plot(freq, amp, label='experimental', ls='-')
+
+    plt.title(f'Amplitude of Transmission from Spaceplate')
     plt.xlabel('Frequency (kHz)')
     plt.ylabel('$|T|^2$')
     plt.grid()
     plt.legend()
     plt.show()
-
 
 
 def TAvsPA(TAfile, PAfile):
@@ -278,6 +285,11 @@ def TAvsPA(TAfile, PAfile):
 filename_PA = "sp_finalgeom_PA.csv"
 filename_TA = "sp_finalgeom_TA.csv"
 
+filename = 'sp_finalgeom_0degPA.csv'
+
+expfile = "scan_sample18.npy"
+backfile = "scan_nosample18.npy"
+
 #filename_df = "comsol_data/spaceplate_dspn4.csv"
 
 # TAvsPA(filename_TA, filename_PA)
@@ -287,4 +299,4 @@ filename_TA = "sp_finalgeom_TA.csv"
 # import mm_dispersion
 # plot1d(filename)
 # plot1d(filename_df, DF=True)
-plot_comparison(filename_PA)
+plot_comparison(filename, expfile, backfile)
