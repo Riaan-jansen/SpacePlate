@@ -6,7 +6,7 @@ from scipy.special import jv, j0, j1  # bessel function 1st kind
 # minimiser tool - is it just differences?
 from scipy.optimize import minimize
 
-from modal_match import T_DF
+from SpacePlate.modal_match_thesis import T_DF
 
 c = 343000
 f_target = 12800  # (Hz)

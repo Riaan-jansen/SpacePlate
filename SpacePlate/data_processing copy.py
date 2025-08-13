@@ -42,9 +42,9 @@ f1 = 5000; f2 = 30000
 ###############################################################################
 ######################### functions for processing ############################
 
-def windowing(data):
-    '''takes data object (3d array). returns 2d array after mean subtraction
-    and tukey windowing''' 
+def windowing(filename):
+    data = np.load(filename)
+
     temp = data[:,0,:]
 
     t_max = int(0.01/dt)
@@ -64,31 +64,45 @@ def windowing(data):
     temp = np.multiply(temp, tukey_window)
     return temp
 
-
 def cleanup(filename, backfile):
     '''only works with 1D scan. load both datasets, mean subtraction and Tukey
     windowing, fft both and element-wise divide.\n
     Input: filepath to data, background.\n
     Returns 2D fft'd array.'''
     data = np.load(filename)
-    backdata = np.load(backfile)
-    temp = windowing(data)
-    noise = windowing(backdata)
-    temp2 = data[:,0,:]
+    back = np.load(backfile)
     
-    # plt.plot(t, temp2[37,:], ls='--', label='w/o window and mean subtract')
-    # plt.plot(t, temp[37,:])
-    # plt.legend()
-    # plt.xlabel('time (s)')
-    # plt.ylabel('signal (V)')
-    # plt.grid()
+    temp = data[:,0,:]
+    noise = back[:,0,:]
+
+    t_max = int(0.01/dt)
+
+    tukey = signal.tukey(t_max, alpha=0.5)
+    tukey_window = np.pad(tukey, (0, max(0, nt - t_max)), mode='constant', 
+                          constant_values=0)
+    
+    # tukey(length=point up until you want to have signal) + zeroes after
+    # tukey * both temp and noise in loops v
+
+    # mean subtraction of the mean of the signal along time for each x step
+    temp_mean = np.mean(temp, axis=1)
+    for i, mean in enumerate(temp_mean):
+        temp[i,:] = temp[i,:] - mean
+
+    back_mean = np.mean(noise, axis=1)
+    for i, mean in enumerate(back_mean):
+        noise[i,:] = noise[i,:] - mean
+
+    noise = np.multiply(noise, tukey_window)
+    temp = np.multiply(temp, tukey_window)
+
+    # plt.plot(t, noise[0,:])
+    # plt.plot(t, noise2[0,:])
     # plt.show()
 
     # fft 2d
-    # fft_temp = np.fft.fftshift(np.fft.fft2(temp))
-    # fft_noise = np.fft.fftshift(np.fft.fft2(noise))
-    fft_temp = np.fft.fftshift(np.fft.fft(temp, axis=1), axes=1)
-    fft_noise = np.fft.fftshift(np.fft.fft(noise, axis=1), axes=1)
+    fft_temp = np.fft.fftshift(np.fft.fft2(temp))
+    fft_noise = np.fft.fftshift(np.fft.fft2(noise))
     # element wise division
     clean_data = np.divide(fft_temp, fft_noise)
 
@@ -126,9 +140,9 @@ def cleanup(filename, backfile):
 def plot1Dxt(filename):
     '''given filepath, plots space vs time and signal as colourmap'''
     data = np.load(filename)  # data is 3d array
-    temp = windowing(data)
+    temp = data[:,0,:].T
 
-    plt.pcolormesh(x, t, temp.T, shading='nearest')
+    plt.pcolormesh(x, t, temp, shading='nearest')
     plt.xlabel('x (m)')
     plt.ylabel('time')
     plt.title('2D Space-time')
@@ -178,21 +192,22 @@ def plot1Damp(filename, backfile, plot=False):
     index2 = np.searchsorted(freq_time, threshold_freq[1], side='right')
     
     freq_time = freq_time[index1:index2]
-    #fft_temp = np.mean(fft_temp, axis=0)
-    # fft_temp = np.clip(fft_temp, 0, 1)
+
+    clipped_temp = np.clip(fft_temp, 0, 1)
+    # clipped_temp = fft_temp
 
     x0 = 288.1  # 18cm scan
     dx = 6.7
     x_idx = int(x0/dx)
     if plot:
-        plt.plot(freq_time, fft_temp[x_idx,index1:index2])
+        plt.plot(freq_time, clipped_temp[x_idx,index1:index2])
         plt.ylabel('Transmission Amplitude')
         plt.xlabel('frequency (Hz)')
         plt.title('Amplitude - frequency @ normal incidence')
         plt.grid()
         plt.show()
 
-    return freq_time, fft_temp[x_idx,index1:index2]
+    return freq_time, clipped_temp[x_idx,index1:index2]
 
     
 def plot2Dfft_old(filename):
@@ -270,28 +285,6 @@ def plot2Dphase(filename, backfile):
     plt.show()
 
 
-def get_x(filename, freq=10000):
-    '''finds the x position where the speaker is using the unwrapped free
-    space phase.\n input = background filepath.\n returns x (mm).'''
-    data = np.load(filename)
-    temp = data[:,0,:]
-    fft_temp = np.fft.fftshift(np.fft.fft(temp, axis=1), axes=1)
-    arg_data = np.angle(fft_temp)
-
-    freq_time = np.fft.fftshift(np.fft.fftfreq(len(t), d=dt))  
-    
-    idx = [i for i, x in enumerate(freq_time) if x == freq]
-
-    slice_data = np.unwrap(arg_data[:,idx], axis=0)
-
-    phase = (slice_data-np.max(slice_data))
-
-    x_idx = [i for i, x in enumerate(phase) if x == 0]
-    
-    return x[x_idx[-1]]
-
-
-
 def plot1Dphase(filename, backfile, freq=18500, angle=False):
     '''argument against space @ one frequency'''
     data = np.load(filename)
@@ -319,8 +312,6 @@ def plot1Dphase(filename, backfile, freq=18500, angle=False):
     # [idx] of freq_time and fft_data
     slice_data = np.unwrap(arg_data[:,idx], axis=0)
     slice_noise = np.unwrap(arg_noise[:,idx], axis=0)
-    # slice_data = arg_data[:,idx]
-    # slice_noise = arg_noise[:,idx]
 
     # amplitude
     fft_clean = np.divide(fft_temp, fft_noise)
@@ -367,7 +358,7 @@ def plot1Dphase(filename, backfile, freq=18500, angle=False):
         # phase - space
         plt.plot(x, phase_sp, label='sample')
         plt.plot(x, phase_free, label='no sample')
-        plt.title(f'Phase - space @ {freq} Hz. Unwrapped')
+        plt.title(f'Phase - space @ {freq} Hz')
         plt.xlabel('x (mm)')
         plt.ylabel('Phase (rad)')
 
@@ -448,48 +439,49 @@ def C_factor(filename, backfile):
     plt.show()
 
 
-def compression_factor_old(filename, backfile):
+def compression_factor(filename, backfile):
     '''calculates the compression factor using geometric argument'''
     x = np.arange(x0,x1+dx,dx)
-    x_0 = get_x(backfile)
-    x = x - x_0
+    x = x - 288.1
 
     # range of distances to try (speaker to mic)
     d_range = np.arange(100,600,1)
 
-    # loading data and time windowing and mean subtracting
     data = np.load(filename)
-    temp = windowing(data)
+    temp = data[:,0,:]
 
     noise = np.load(backfile)
-    temp_noise = windowing(noise)
+    temp_noise = noise[:,0,:]
+
+    # time windowing
+    t_max = int(0.01/dt)
+    tukey = signal.tukey(t_max, alpha=0.5)
+    tukey_window = np.pad(tukey, (0, max(0, nt - t_max)), mode='constant', 
+                          constant_values=0)
+
+    temp = np.multiply(temp, tukey_window)
+    temp_noise = np.multiply(temp_noise, tukey_window)
 
     # fourier transform along time axis
     fft_noise = np.fft.fftshift(np.fft.rfft(temp_noise, axis=1), axes=1)
-    fft_temp = np.fft.fftshift(np.fft.rfft(temp, axis=1), axes=1)
-
-    # taking the argument of the data
     arr_noise = np.angle(fft_noise)
+    fft_temp = np.fft.fftshift(np.fft.rfft(temp, axis=1), axes=1)
     arr_data = np.angle(fft_temp)
 
     # slicing
     freq_time = np.fft.fftshift(np.fft.rfftfreq(len(t), d=dt))
-    threshold_freq = (5000, 30000)
+    threshold_freq = (5000, 15000)
     index1 = np.searchsorted(freq_time, threshold_freq[0])#, side='left')
     index2 = np.searchsorted(freq_time, threshold_freq[1])#, side='right')
 
-    threshold_x = (-150, 150)
+    threshold_x = (-100, 100)
     x_idx1 = np.searchsorted(x, threshold_x[0])
     x_idx2 = np.searchsorted(x, threshold_x[1])
 
     x = x[x_idx1:x_idx2]
+    freq_time = freq_time[index1:index2]
     arr_data = arr_data[x_idx1:x_idx2,index1:index2]
     arr_noise = arr_noise[x_idx1:x_idx2,index1:index2]
-    
-    freq_time = freq_time[index1:index2]
-
-    # arr_data = arr_data[:,index1:index2]
-    # arr_noise = arr_noise[:,index1:index2]
 
     # looping over frequencies
     z_free = np.zeros_like(freq_time)
@@ -498,22 +490,21 @@ def compression_factor_old(filename, backfile):
         phase_sp = np.unwrap(arr_data[:,i], axis=0)
         phase_free = np.unwrap(arr_noise[:,i], axis=0)
 
-        phase_free = (phase_free - np.max(phase_free, axis=0))
-        phase_sp = (phase_sp - np.max(phase_sp, axis=0))
+        phase_free = (phase_free-np.max(phase_free, axis=0))
+        phase_sp = (phase_sp-np.max(phase_sp, axis=0))
 
-        # looping over every trial d value - probably is a better way of doing this
         diff_free = np.zeros_like(d_range)  # empties for every f
         diff_sp = np.zeros_like(d_range)
         index = 0
         for d in d_range:
             phase_theory = 2*pi*f/c0 * np.sqrt(d**2 + x**2)
-            phase_theory = (-phase_theory - np.max(-phase_theory))#, axis=0))  # set to max at y=0 and invert to match the shape of the data
+            phase_theory = (-phase_theory - np.max(-phase_theory, axis=0))  # set to max at y=0 and invert to match the shape of the data
             # phase_theory = (phase_theory - np.max(phase_theory, axis=0))
 
             res_free = ( (phase_free - phase_theory) - np.mean(phase_free - phase_theory) )**2
             res_sp = ( (phase_sp - phase_theory) - np.mean(phase_sp - phase_theory) )**2
 
-            # print(res_free, 'res_free') 
+            #print(res_free, 'res_free') 
 
             # plt.plot(x, phase_theory, label='theoretical phase')
             # plt.plot(x, phase_free, label='measured free space phase')
@@ -525,24 +516,21 @@ def compression_factor_old(filename, backfile):
             # plt.show()
             # sys.exit()
 
-            # diff_free[index] = (np.mean(res_free))
-            # diff_sp[index] = (np.mean(res_sp))
             diff_free[index] = np.sqrt(np.mean(res_free))
+            #print(diff_free, 'diff_free')
             diff_sp[index] = np.sqrt(np.mean(res_sp))
-            
             index = index + 1
 
         idx_free = np.argmin(diff_free)
-
         z_free[i] = d_range[idx_free]
 
         idx_sp = np.argmin(diff_sp)
         z_sp[i] = d_range[idx_sp]
 
-        plt.plot(d_range, diff_free)
-        plt.plot(x, res_free)
-        plt.show()
-        sys.exit()
+        # plt.plot(d_range, diff_free)
+        # plt.plot(x, res_free)
+        # plt.show()
+        # sys.exit()
 
         # check_theory = 2*pi*f/c0 * np.sqrt(z_free[i]**2 + x**2)
         # check_theory = (-check_theory - np.max(-check_theory, axis=0))
@@ -579,215 +567,6 @@ def compression_factor_old(filename, backfile):
 
     return C
 
-def compression_factor(filename, backfile):
-    '''NEW calculates the compression factor using geometric argument'''
-    x = np.arange(x0,x1+dx,dx)
-    x_0 = get_x(backfile)
-    x = x - x_0
-
-    # range of distances to try (speaker to mic)
-    d_range = np.arange(100,600,1)
-
-    # loading data and time windowing and mean subtracting
-    data = np.load(filename)
-    temp = windowing(data)
-
-    noise = np.load(backfile)
-    temp_noise = windowing(noise)
-
-    # fourier transform along time axis
-    fft_noise = np.fft.fftshift(np.fft.rfft(temp_noise, axis=1), axes=1)
-    fft_temp = np.fft.fftshift(np.fft.rfft(temp, axis=1), axes=1)
-
-    # taking the argument of the data
-    arr_noise = np.angle(fft_noise)
-    arr_data = np.angle(fft_temp)
-
-    # frequency slicing
-    freq_time = np.fft.fftshift(np.fft.rfftfreq(len(t), d=dt))
-    threshold_freq = (5000, 20000)
-    index1 = np.searchsorted(freq_time, threshold_freq[0])#, side='left')
-    index2 = np.searchsorted(freq_time, threshold_freq[1])#, side='right')
-
-    # amplitude
-    fft_clean = np.divide(fft_temp, fft_noise)
-
-    t_clean = np.abs(fft_clean)**2
-    t_clean = t_clean/np.max(t_clean)
-
-    # plt.plot(x, t_clean[:,index1])
-    # plt.show()
-
-    # space slicing 
-    threshold_x = (-220, 220)
-    x_idx1 = np.searchsorted(x, threshold_x[0])
-    x_idx2 = np.searchsorted(x, threshold_x[1])
-
-    x = x[x_idx1:x_idx2]
-
-    arr_data = arr_data[x_idx1:x_idx2,index1:index2]
-    arr_noise = arr_noise[x_idx1:x_idx2,index1:index2]
-    
-    freq_time = freq_time[index1:index2]
-
-    # arr_data = arr_data[:,index1:index2]
-    # arr_noise = arr_noise[:,index1:index2]
-
-    def phase_theory(x, *params):
-        y = np.zeros_like(x)
-        for i in range(0, len(params), 1):
-            d = params[i]
-            y = y + 2*pi*f/c0 * np.sqrt(d**2 + x**2)
-        return (-y - np.max(-y, axis=0))
-
-    # looping over frequencies
-    z_free = np.zeros_like(freq_time)
-    z_sp = np.zeros_like(freq_time)
-    free_cov = np.zeros_like(freq_time)
-    sp_cov = np.zeros_like(freq_time)
-    for i, f in enumerate(freq_time):
-        phase_sp = np.unwrap(arr_data[:,i], axis=0)
-        phase_free = np.unwrap(arr_noise[:,i], axis=0)
-
-        phase_free = (phase_free - np.max(phase_free, axis=0))
-        phase_sp = (phase_sp - np.max(phase_sp, axis=0))
-
-        # looping over every trial d value - probably is a better way of doing this
-        diff_free = np.zeros_like(d_range)  # empties for every f
-        diff_sp = np.zeros_like(d_range)
-
-        opt_free, cov_free = curve_fit(phase_theory, x, phase_free, p0=[200])
-        opt_sp, cov_sp = curve_fit(phase_theory, x, phase_sp, p0=[400])  # this guess will likely influence result
-
-        z_free[i] = opt_free
-
-        z_sp[i] = opt_sp
-
-        free_cov[i] = cov_free
-        sp_cov[i] = cov_sp
-
-
-
-        # fig, axs = plt.subplots(2)
-        # fig.suptitle(f'Normalised Theoretical Phase vs Data @ {f:.0f} Hz')
-        # axs[0].plot(x, phase_theory(x, z_sp[i]), label=f'theoretical fit d={z_sp[i]:.2f}')
-        # axs[0].plot(x, phase_sp, label='spaceplate phase')
-        # axs[1].plot(x, phase_theory(x, z_free[i]), label=f'theoretical fit d={z_free[i]:.2f}')
-        # axs[1].plot(x, phase_free, label='free space phase')
-        
-        # axs[0].grid()
-        # axs[0].legend()
-        # axs[1].grid()
-        # axs[1].legend()
-        # plt.xlabel('x (mm)')
-
-        # # axs[2].plot(freq_time, t_clean[int((x_idx2-x_idx1)/2),index1:index2], label ='$|t|^2$')
-        # # axs[2].set_ylabel('Fourier amplitude')
-        # # axs[2].grid()
-        # # axs[2].legend()
-        # # axs[2].set_xlabel('Frequency (Hz)')
-        # # # plt.plot(x, phase_theory(x, z_sp[i]), label='theoretical phase')
-        # # # plt.plot(x, phase_sp, label='measured free space phase')
-        # # # plt.title(f'Normalised Phase theory vs data d={z_free[i]:.2f} @ {f:.0f} Hz')
-        
-        # plt.show()
-        # sys.exit()
-        # index = 0
-        # for d in d_range:
-            #phase_theory = 2*pi*f/c0 * np.sqrt(d**2 + x**2)
-
-
-            #phase_theory = (-phase_theory - np.max(-phase_theory))#, axis=0))  # set to max at y=0 and invert to match the shape of the data
-            # phase_theory = (phase_theory - np.max(phase_theory, axis=0))
-
-            # res_free = ( (phase_free - phase_theory) - np.mean(phase_free - phase_theory) )**2
-            # res_sp = ( (phase_sp - phase_theory) - np.mean(phase_sp - phase_theory) )**2
-
-            #print(res_free, 'res_free') 
-
-            # plt.plot(x, phase_theory, label='theoretical phase')
-            # plt.plot(x, phase_free, label='measured free space phase')
-            # plt.grid()
-            # plt.legend()
-            # plt.title(f'Normalised Phase theory vs data d={d}')
-            # plt.xlabel('x (mm)')
-            # plt.ylabel('Phase')
-            # plt.show()
-            # sys.exit()
-
-            # diff_free[index] = (np.mean(res_free))
-            # diff_sp[index] = (np.mean(res_sp))
-        #     diff_free[index] = np.sqrt(np.mean(res_free))
-        #     diff_sp[index] = np.sqrt(np.mean(res_sp))
-
-        #     # optimised, covariance = curve_fit(gaussian, freq_time, fft_data[x_idx,index1:index2], p0=guess)
-        #     # fit = gaussian(freq_time, *optimised)
-
-        #     index = index + 1
-
-        # idx_free = np.argmin(diff_free)
-        # print(diff_free)
-        # print(idx_free)
-        # z_free[i] = d_range[idx_free]
-
-        # idx_sp = np.argmin(diff_sp)
-        # z_sp[i] = d_range[idx_sp]
-
-        # plt.plot(d_range, diff_free)
-        # plt.plot(x, res_free)
-        # plt.show()
-        # sys.exit()
-
-        # check_theory = 2*pi*f/c0 * np.sqrt(z_free[i]**2 + x**2)
-        # check_theory = (-check_theory - np.max(-check_theory, axis=0))
-        # plt.plot(x, check_theory, label='theoretical phase')
-        # plt.plot(x, phase_free, label='measured free space phase')
-        # plt.grid()
-        # plt.legend()
-        # plt.title(f'Normalised Phase theory vs data d={z_free[i]}')
-        # plt.xlabel('x (mm)')
-        # plt.ylabel('Phase')
-        # plt.show()
-        # sys.exit()
-
-    tot_cov = free_cov + sp_cov
-    tot_err = np.sqrt((tot_cov))
-
-    # for i, ele in enumerate(tot_err):
-    #     if ele >= 10:
-    #         # tot_cov = np.delete(tot_cov, tot_cov[i])
-    #         # z_free = np.delete(z_free, z_free[i])
-    #         # z_sp = np.delete(z_sp, z_sp[i])
-    #         # freq_time = np.delete(freq_time, freq_time[i])
-    #         tot_err[i] = 0
-    #         z_free[i] = 0
-    #         z_sp[i] = 0
-    #         freq_time[i] = 0
-
-    L = z_sp - z_free
-    C = (L + d_sp) / d_sp
-
-    plt.plot(freq_time/1000, -z_free, label='free space')
-    plt.plot(freq_time/1000, -z_sp, label='spaceplate')
-    plt.xlabel('Frequency (kHz)')
-    plt.ylabel('Apparent Distance to Source (mm)')
-    plt.title('Spaceplate Compression Factor')
-    plt.grid()
-    plt.legend()
-    plt.show()
-
-    plt.scatter(freq_time/1000, C, label='spaceplate', s=5, c=tot_err)
-    plt.colorbar(label='Deviation')
-    plt.xlabel('Frequency (kHz)')
-    plt.ylabel('Compression Factor')
-    plt.title('Spaceplate Compression Factor')
-    #plt.xlim((8,12))
-    plt.grid()
-    plt.legend()
-    plt.show()
-
-    return C
-
 
 def compression_resonant(filename, backfile):
     '''fits a lorentzian to the resonant peaks to find Q factor. Q gives
@@ -800,8 +579,9 @@ def compression_resonant(filename, backfile):
     fft_data = np.clip(fft_data, 0, 1)
     # clipped_temp = fft_temp
 
-    x_0 = get_x(backfile)
-    x_idx = np.searchsorted(x, x_0)
+    x0 = 288.1  # 18cm scan
+    dx = 6.7
+    x_idx = int(x0/dx)
 
     def gaussian(x, *params):
         t = np.zeros_like(x)
@@ -860,106 +640,6 @@ def compression_resonant(filename, backfile):
         print(f'C = {c:.2f} @ f = {centres[i]:.0f} Hz')
 
 
-def graph_all(filename, backfile, freq=10000):
-    '''given filepath to sample and no sample data - optional: frequency 
-    (default 10kHz) - returns 4 subplots:\n
-    - Transmission over frequency range (range hardcoded)\n
-    - Signal over space\n
-    - Wrapped phase response over space\n
-    - Unwrapped phase'''
-    x = np.arange(x0,x1+dx,dx)
-    x_0 = get_x(backfile)
-    x_idx = np.searchsorted(x, x_0)
-    x = x - x_0
-
-    # loading data and time windowing and mean subtracting
-    data = np.load(filename)
-    temp = windowing(data)
-
-    noise = np.load(backfile)
-    temp_noise = windowing(noise)
-
-    # fourier transform along time axis
-    fft_noise = np.fft.fftshift(np.fft.fft(temp_noise, axis=1), axes=1)
-    fft_temp = np.fft.fftshift(np.fft.fft(temp, axis=1), axes=1)
-
-    # taking the argument of the data
-    arr_noise = np.angle(fft_noise)
-    arr_data = np.angle(fft_temp)
-
-    # frequency slicing
-    freq_time = np.fft.fftshift(np.fft.fftfreq(len(t), d=dt))
-    threshold_freq = (5000, 30000)
-    
-    index1 = np.searchsorted(freq_time, threshold_freq[0])#, side='left')
-    index2 = np.searchsorted(freq_time, threshold_freq[1])#, side='right')
-    freq_time = freq_time[index1:index2]
-    # frequency to plot for
-    idx = np.searchsorted(freq_time, freq)
-
-    # amplitude
-    fft_clean = np.divide(fft_temp, fft_noise)
-    t_clean = np.abs(fft_clean)**2
-    # t_clean = t_clean/np.max(t_clean)
-
-    # plt.plot(x, t_clean[:,index1])
-    # plt.show()
-
-    # space slicing 
-    # threshold_x = (-200, 200)
-    # x_idx1 = np.searchsorted(x, threshold_x[0])
-    # x_idx2 = np.searchsorted(x, threshold_x[1])
-    # x = x[x_idx1:x_idx2]
-
-    # arr_data = arr_data[x_idx1:x_idx2,index1:index2]
-    # arr_noise = arr_noise[x_idx1:x_idx2,index1:index2]
-
-    arr_data = arr_data[:,index1:index2]
-    arr_noise = arr_noise[:,index1:index2]
-
-    # unwarpped phase
-    phase_sp = np.unwrap(arr_data[:,idx], axis=0)
-    phase_free = np.unwrap(arr_noise[:,idx], axis=0)
-
-    phase_free = (phase_free - np.max(phase_free, axis=0))
-    phase_sp = (phase_sp - np.max(phase_sp, axis=0))
-
-    # wrapped phase
-    wphase_free = (arr_noise[:,idx] - np.max(arr_noise[:,idx], axis=0))
-    wphase_sp = (arr_data[:,idx] - np.max(arr_data[:,idx], axis=0))
-
-    fig, axs = plt.subplots(4)
-    fig.suptitle(f'Normalised Theoretical Phase vs Data @ {freq:.0f} Hz')
-
-    axs[0].plot(freq_time, t_clean[x_idx,index1:index2], label ='$|t|^2$')
-    axs[0].set_ylabel(r'$|t|^2$')
-    axs[0].set_xlabel('Frequency (Hz)')
-
-    axs[1].plot(x, np.abs(fft_temp[:,idx+index1]), label='spaceplate')
-    axs[1].plot(x, np.abs(fft_noise[:,idx+index1]), label='free space')
-    axs[1].set_ylabel('$|t|$')
-
-    axs[2].plot(x, wphase_sp, label='spaceplate phase')
-    axs[2].plot(x, wphase_free, label='free space phase')
-    axs[2].set_ylabel('Wrapped Phase')
-
-    axs[3].plot(x, phase_sp, label='spaceplate phase')
-    axs[3].plot(x, phase_free, label='free space phase')
-    axs[3].set_ylabel('Unwrapped Phase')
-
-    axs[0].grid()
-    axs[0].legend()
-    axs[1].grid()
-    axs[1].legend()
-    axs[2].grid()
-    axs[2].legend()
-    axs[3].grid()
-    axs[3].legend()
-    plt.xlabel('x (mm)')
-
-    plt.show()
-    return
-
 ###############################################################################
 ################################ calling ######################################
 
@@ -969,20 +649,16 @@ def graph_all(filename, backfile, freq=10000):
 # filename = r'scan_sample11.npy'
 # backfile = r'scan_nosample11.npy'
 
-# filename = r'scan_sample23.npy'
-# backfile = r'scan_nosample23.npy'
-
-filename = 'scan_sp55.npy'
-backfile = 'scan_ns55.npy'
+filename = r'scan_sample18.npy'
+backfile = r'scan_nosample18.npy'
 
 # compression_resonant(filename, backfile)
-#compression_factor(filename, backfile)
-graph_all(filename, backfile)
-# cleanup(filename, backfile)
+compression_factor(filename, backfile)
+
+#cleanup(filename, backfile)
 # plot2Dfft(filename, backfile)
-# plot1Damp(filename, backfile, plot=True)
+#plot1Damp(filename, backfile, plot=True)
 # plot1Dfft(filename)
-# plot1Dxt(backfile)
-# plot1Dphase(filename, backfile, freq=10000)
+#plot1Dphase(filename, backfile, freq=10500)
 # find_freq(filename, backfile)
 # C_factor(filename, backfile)
