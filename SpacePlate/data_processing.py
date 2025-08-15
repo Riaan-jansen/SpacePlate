@@ -103,7 +103,7 @@ Functions:
 import numpy as np
 from numpy import pi
 from scipy import signal
-from scipy.optimize import minimize, curve_fit
+from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 import sys
@@ -141,13 +141,14 @@ def windowing(data):
     and tukey windowing''' 
     temp = data[:,0,:]
 
-    # plt.plot(t, temp[100,:])
+    # plt.plot(t, temp[0,:])
     # plt.title('raw data time signal')
     # plt.xlabel('time (s)')
     # plt.ylabel('signal (V)')
     # plt.show()
 
-    t_max = int(0.0055/dt)  # 0.006/dt is best for 21_x3
+    #########################################################
+    t_max = int(0.006/dt)  # 0.006/dt is best for 21_x3
 
     tukey = signal.tukey(t_max, alpha=0.5)
     tukey_window = np.pad(tukey, (0, max(0, nt - t_max)), mode='constant', 
@@ -484,8 +485,7 @@ def compression_factor(filename, backfile):
     OPTIONAL:\n
     - can plot the fitted phases for each frequency by uncommenting code block
     '''
-
-    f1 = 5000; f2 = 30000
+    f1 = 8000; f2 = 30000
     x = np.arange(x0,x1+dx,dx)
     x_0 = get_x(backfile)
     x_idx = np.searchsorted(x, x_0)
@@ -509,35 +509,31 @@ def compression_factor(filename, backfile):
     # frequency slicing
     freq_time = np.fft.fftshift(np.fft.rfftfreq(len(t), d=dt))
     threshold_freq = (f1, f2)
-    index1 = np.searchsorted(freq_time, threshold_freq[0])#, side='left')
-    index2 = np.searchsorted(freq_time, threshold_freq[1])#, side='right')
-
-    # amplitude
-    fft_clean = np.divide(fft_temp, fft_noise)
-
-    t_clean = np.abs(fft_clean)**2
-    # t_clean = t_clean/np.max(t_clean)
-
-    # space slicing
-
-    # threshold_x = (-220, 220)
-    # x_idx1 = np.searchsorted(x, threshold_x[0])
-    # x_idx2 = np.searchsorted(x, threshold_x[1])
-
-    # x = x[x_idx1:x_idx2]
-
-    # arr_data = arr_data[x_idx1:x_idx2,index1:index2]
-    # arr_noise = arr_noise[x_idx1:x_idx2,index1:index2]
-    
+    index1 = np.searchsorted(freq_time, threshold_freq[0])
+    index2 = np.searchsorted(freq_time, threshold_freq[1])
     freq_time = freq_time[index1:index2]
 
+    ###########################################################################
+    # space slicing based on an arb and global x values - needs work
+    # threshold_x = (-180, 180)
+    # x_idx1 = np.searchsorted(x, threshold_x[0])
+    # x_idx2 = np.searchsorted(x, threshold_x[1])
+    # x = x[x_idx1:x_idx2]
+    # arr_data = arr_data[x_idx1:x_idx2,index1:index2]
+    # arr_noise = arr_noise[x_idx1:x_idx2,index1:index2]
+
+    # comment / uncomment if you do / dont use the above
     arr_data = arr_data[:,index1:index2]
     arr_noise = arr_noise[:,index1:index2]
+    
+    ###########################################################################
 
     def phase_theory(x, *params):
+        '''theoretical best fit to phase based on Green's function'''
         y = np.zeros_like(x)
         for i in range(0, len(params), 1):
             d = params[i]
+            # can take more params or use a different form of solution entirely
             y = y + 2*pi*f/c0 * np.sqrt(d**2 + x**2)
         return (-y - np.max(-y, axis=0))
 
@@ -550,7 +546,8 @@ def compression_factor(filename, backfile):
     # looping over frequencies
     for i, f in enumerate(freq_time):
 
-        # slicing in space according to transmission strength
+        #######################################################################
+        ### slicing in space according to transmission strength - also needs work
         # V = np.abs(fft_temp[:,i+index1])
 
         # i1, i2 = search_closest(V)
@@ -561,6 +558,7 @@ def compression_factor(filename, backfile):
 
         # i1_f, i2_f = i1, i2
 
+        ###### to visualise |t|
         # plt.plot(x, V)
         # plt.plot(x[i1:i2], V[i1:i2])
         # plt.plot(x, Vf)
@@ -571,35 +569,29 @@ def compression_factor(filename, backfile):
 
         # phase_sp = np.unwrap(arr_data[i1:i2,i], axis=0)
         # phase_free = np.unwrap(arr_noise[i1_f:i2_f,i], axis=0)
+        #######################################################################
 
+        # unwrapping phase
         phase_sp = np.unwrap(arr_data[:,i], axis=0)
         phase_free = np.unwrap(arr_noise[:,i], axis=0)
-        skip = False
-        try:
-            phase_free = (phase_free - np.max(phase_free, axis=0))
-            phase_sp = (phase_sp - np.max(phase_sp, axis=0))
-        except ValueError:
-            skip = True
 
-        if skip is False:
-            guess = D
-            # opt_free, cov_free = curve_fit(phase_theory, x[i1_f:i2_f], phase_free, p0=[guess])
-            # opt_sp, cov_sp = curve_fit(phase_theory, x[i1:i2], phase_sp, p0=[guess*2])  # this guess will likely influence result
-            opt_free, cov_free = curve_fit(phase_theory, x, phase_free, p0=[guess])
-            opt_sp, cov_sp = curve_fit(phase_theory, x, phase_sp, p0=[guess*2]) 
+        # normalising phase
+        phase_free = (phase_free - np.max(phase_free, axis=0))
+        phase_sp = (phase_sp - np.max(phase_sp, axis=0))
 
-            z_free[i] = opt_free
-            z_sp[i] = opt_sp  # sometimes this is -ve when d is squared so shouldn't make any difference? but it might be a sign something is going wrong
+        guess = D  # the actual known distance from source
 
-            free_cov[i] = cov_free
-            sp_cov[i] = cov_sp
-        else:
-            z_free[i] = 0
-            z_sp[i] = 0
+        # perform curve fit
+        opt_free, cov_free = curve_fit(phase_theory, x, phase_free, p0=[guess])
+        opt_sp, cov_sp = curve_fit(phase_theory, x, phase_sp, p0=[guess*2])  # 
 
-            free_cov[i] = 0
-            sp_cov[i] = 0
-            pass
+        # save optimised parameters
+        z_free[i] = opt_free
+        z_sp[i] = opt_sp  # sometimes this is -ve when d is squared so shouldn't make any difference? but it might be a sign something is going wrong
+
+        free_cov[i] = cov_free
+        sp_cov[i] = cov_sp
+
         # opt_free, cov_free = curve_fit(phase_theory, x, phase_free, p0=[200])
         # opt_sp, cov_sp = curve_fit(phase_theory, x, phase_sp, p0=[600])
 
@@ -626,8 +618,22 @@ def compression_factor(filename, backfile):
         # plt.xlabel('x (mm)')
         # plt.show()
         # sys.exit()
+
+#######         Plotting theoretical fits for free space and space plate
+        # fig, axs = plt.subplots(1)
+        # fig.suptitle(f'Normalised Theoretical Phase @ {f:.0f} Hz')
+        # axs.plot(x, phase_theory(x, z_sp[i]), label=f'space plate fit d={z_sp[i]:.2f}')
+        # axs.plot(x, phase_theory(x, z_free[i]), label=f'free space fit d={z_free[i]:.2f}')
+        # axs.grid()
+        # axs.legend()
+        # plt.xlabel('x (mm)')
+        # plt.show()
+        # sys.exit()
+
 ###############################################################################
 
+    # this isn't proper error propagation but it's quick to tell you what 
+    # points are rubbish
     tot_cov = free_cov + sp_cov
     tot_err = np.sqrt((tot_cov))
 
@@ -700,18 +706,20 @@ def compression_resonant(filename, backfile):
     index2 = np.searchsorted(freq_time, f2, side='right')
     freq_time = freq_time[index1:index2]
     
-    # guess has lists length(params) for as many peaks as there should be present
+    # guess has lists len(params) for as many peaks as there should be present
     # each guess is a list of 3 (params)
-    guess1 = [10000, 1, 10]
-    guess2 = [18000, 1, 10]
-    guess3 = [26000, 0.5, 10]
+    guess1 = [10000, 0.8, 400]
+    guess2 = [18000, 0.4, 300]
+    guess3 = [26000, 0.1, 300]
     #guess4 = [35000, 0.5, 10]
     guess = guess1 + guess2 + guess3 # + guess4
 
     # fft_data[x_idx,:] = fft_data[x_idx,:]/np.max(fft_data[x_idx,:])
 
-    # performs the curve fit gaussian to the data - for bst results data needs cleanup and windowing
-    optimised, covariance = curve_fit(gaussian, freq_time, fft_data[x_idx,index1:index2], p0=guess)
+    # performs the curve fit gaussian to the data
+    # for best results data needs cleanup and windowing
+    optimised, covariance = curve_fit(gaussian, freq_time, 
+                                      fft_data[x_idx,index1:index2], p0=guess)
 
     fit = gaussian(freq_time, *optimised)
 
@@ -813,7 +821,7 @@ def graph_all(filename, backfile, freq=10000):
     # plt.plot(x, t_clean[:,index1])
     # plt.show()
 
-    # space slicing 
+    # ##################   space slicing #################
     # threshold_x = (-200, 200)
     # x_idx1 = np.searchsorted(x, threshold_x[0])
     # x_idx2 = np.searchsorted(x, threshold_x[1])
@@ -836,11 +844,7 @@ def graph_all(filename, backfile, freq=10000):
     wphase_free = (arr_noise[:,idx] - np.max(arr_noise[:,idx], axis=0))
     wphase_sp = (arr_data[:,idx] - np.max(arr_data[:,idx], axis=0))
 
-    # plt.plot(x, np.abs(fft_temp[:,idx+index1]), label='spaceplate')
-    # plt.plot(x, np.abs(fft_noise[:,idx+index1]), label='free space')
-    # plt.show()
-    # sys.exit()
-
+    # plot
     fig, axs = plt.subplots(4)
     fig.suptitle(f'Spaceplate Data @ {freq:.0f} Hz')
 
@@ -921,4 +925,4 @@ if __name__ == '__main__':
     # plot1Dxt(backfile)
 
     # data = np.load(filename)
-    # windowing(data)
+    # temp =  windowing(data)

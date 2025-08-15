@@ -47,7 +47,7 @@ def plot_amplitude(filename, plot=True):
     plot with other plotted data.'''
     data, columns = read_data(filename)
 
-    data_num = data[:,2]
+    data_num = data[:,1]
 
     plt.plot(data[:, 0], data_num, label='numerical', ls=':')
     if plot is True:
@@ -125,66 +125,11 @@ def plot_dispersion(filename):
     plt.xlim(right=0.47)
     plt.show()
 
-
-def plot_comparison(filename, expfile, backfile):
-    '''to plot comparison between theoretical, numerical and exeprimental data.
-    comment out according to what you need to compare.'''
-
-    ########################### analytical plotting ###########################
-    N = 2000
-    # frequency range
-    k = 2*np.pi/c * np.linspace(f1, f2, N)
-
-    # list of modes
-    size = 3
-    m = [(m1, m2) for m1 in range(-size, size+1) for m2 in range(-size, size+1)]
-    m = list(dict.fromkeys(m))
-
-    # get normalised transmission values
-    Z = T(0, k, m)
-    Z = np.abs(Z)**2
-    Z = (Z - np.min(Z)) / (np.max(Z) - np.min(Z))
-
-    plt.plot(np.linspace(f1, f2, N), Z, label='analytical')
-
-    ########################### numerical plotting ############################
-    # for single angle sweep over frequency csv
-    # plot_amplitude(filename, plot=False)
     
-    # ==========================================================
-    ############# for parametric sweep data plotting ########### 
-    # ==========================================================
-    # data, columns = read_data(filename)
-    
-    # freqs = []
-    # for part in columns[1:]:
-    #     if 'freq=' in part:
-    #         freq = float(part.split('freq=')[1].split(' ')[0])
-    #         freqs.append(freq)
-
-    # eval = data[0]
-    # plt.plot(freqs, eval[:-1], label='numerical', ls='--')  # for parametric sweep data
-    # ==========================================================
-
-    ########################### experimental plotting #########################
-    from data_processing import plot1Damp
-    freq, amp = plot1Damp(expfile, backfile)
-
-    plt.scatter(freq, amp, label='experimental', s=7, color='r')
-
-    ############################### plot all ##################################
-    plt.title(f'Amplitude of Transmission from Spaceplate')
-    plt.xlabel('Frequency (kHz)')
-    # plt.xlim((f1, f2))
-    plt.ylabel('$|T|^2$')
-    plt.grid()
-    plt.legend()
-    plt.show()
-
-
 def TAvsPA(TAfile, PAfile):
-    # angle
-    theta_idx = 40
+    '''for plotting of PA vs TA comsol runs'''
+    # choose angle
+    theta_idx = 0
 
     # thermoacoustic losses
     t_data, t_cols = read_data(TAfile)
@@ -223,34 +168,85 @@ def TAvsPA(TAfile, PAfile):
     plt.show()
 
 
+def plot_comparison(filename, expfile, backfile):
+    '''to plot comparison between theoretical, numerical and exeprimental data.
+    comment out according to what you need to compare.'''
+
+    ########################### analytical plotting ###########################
+    # N = 2000
+    # # frequency range
+    # k = 2*np.pi/c * np.linspace(f1, f2, N)
+
+    # # list of modes
+    # size = 3
+    # m = [(m1, m2) for m1 in range(-size, size+1) for m2 in range(-size, size+1)]
+    # m = list(dict.fromkeys(m))
+
+    # # get normalised transmission values
+    # Z = T(0, k, m)
+    # Z = np.abs(Z)**2
+    # Z = (Z - np.min(Z)) / (np.max(Z) - np.min(Z))
+
+    # plt.plot(np.linspace(f1, f2, N), Z, label='analytical')
+
+    ########################### numerical plotting ############################
+    # for single angle sweep over frequency csv
+    # plot_amplitude(filename, plot=False)
+    
+    # ==========================================================
+    ############# for parametric sweep data plotting ########### 
+    # ==========================================================
+    data, columns = read_data(filename)
+    
+    freqs = []
+    for part in columns[:-1]:
+        if 'freq=' in part:
+            freq = float(part.split('freq=')[1].split(' ')[0])
+            freqs.append(freq)
+
+    eval = data[0]
+    plt.plot(freqs, eval[1:], label='numerical', ls='--')  # for parametric sweep data
+    # ==========================================================
+
+    ########################### experimental plotting #########################
+    from data_processing import plot1Damp
+    freq, amp = plot1Damp(expfile, backfile)
+
+    plt.scatter(freq, amp, label='experimental', s=7, color='r')
+
+    ############################### plot all ##################################
+    plt.title(f'Amplitude of Transmission from Spaceplate')
+    plt.xlabel('Frequency (kHz)')
+    # plt.xlim((f1, f2))
+    plt.ylabel('$|T|^2$')
+    plt.grid()
+    plt.legend()
+    plt.show()
+
+
 if __name__ == '__main__':
-    # filename_PA = "comsol_data/sp_df3dPA.csv"
-    # filename_TA = "comsol_data/sp_df3dTA.csv"
 
-    filename_PA = "comsol_data/sp_finalgeom_PA.csv"
-    filename_TA = "comsol_data/sp_finalgeom_TA.csv"
-
-    filename_TA = "ta_newgeom_t5again.csv"
+    filename_PA = "comsol_data/sp_oldgeom_PA.csv"
+    filename_TA = "comsol_data/sp_oldgeom_TA.csv"
 
     # filename_PA = 'comsol_data/sp_final_PA0.csv'
 
     filename = 'comsol_data/sp_finalgeom_0degPA.csv'
+    filename = 'comsol_data/sp_finalgeom_TA_t5.csv'
 
+    # the experimental data file to compare to !
     expfile = "scan_data/scan_sp21.npy"
     backfile = "scan_data/scan_ns21.npy"
-
-    filename2 = "sp_finalgeom_t5TA.csv"
-    filename3 = 'Ta-stillbad0.csv'
-    filename3 = 'Untitled2.csv'
 
     # ************ plot comparison lossless/ w. losses **************
     # TAvsPA(filename_TA, filename_PA)  
 
     # ***************** plot dispersion relation ********************
-    plot_dispersion(filename_TA)
+    plot_dispersion(filename)
 
     # ***************** plot transmission normal ********************
-    # plot1d(filename)
+
+    # plot_amplitude(filename)
 
     # ************** plot transmission comparision ******************
-    # plot_comparison(filename_PA, expfile, backfile)
+    # plot_comparison(filename_TA, expfile, backfile)

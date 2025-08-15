@@ -167,7 +167,7 @@ def amplitude_plot():
     k0 = 2*np.pi/c * np.linspace(f1, f2, N)
 
     # list of modes (not repeating) range [-2,2] for m1 and m2
-    size = 3
+    size = 6
     modes= [(m1, m2) for m1 in range(-size+1, size) for m2 in range(-size+1, size)]
     modes = list(dict.fromkeys(modes))
 
