@@ -233,6 +233,7 @@ if __name__ == '__main__':
 
     filename = 'comsol_data/sp_finalgeom_0degPA.csv'
     filename = 'comsol_data/sp_finalgeom_TA_t5.csv'
+    filename = 'comsol_data/sp_finalgeom_TA_t1.csv'
 
     # the experimental data file to compare to !
     expfile = "scan_data/scan_sp21.npy"
@@ -242,7 +243,7 @@ if __name__ == '__main__':
     # TAvsPA(filename_TA, filename_PA)  
 
     # ***************** plot dispersion relation ********************
-    plot_dispersion(filename)
+    # plot_dispersion(filename)
 
     # ***************** plot transmission normal ********************
 
