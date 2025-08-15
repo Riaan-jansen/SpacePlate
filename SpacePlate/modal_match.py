@@ -11,7 +11,7 @@ Old values to match Murray thesis: d=8, a=1.2, hg=0.47/0.94
 '''
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.special import jv  # bessel function vth kind jv(v, arg)
+from scipy.special import jv  # bessel function 1st kind vth order jv(v, arg)
 
 from scipy.integrate import dblquad
 
@@ -19,16 +19,16 @@ from scipy.integrate import dblquad
 d = 6.7  # pitch (mm)
 # a = np.sqrt(np.pi * (0.0024/2)**2)  # so circle and square have same area
 a = 1.3
-rho = 1.18E-9  # 1.225E-9  # air density (E-9kg/mmc)
+rho = 1.185E-9  # air density (E-9kg/mmc)
 rho_prime = rho
 c = 344820  # (mm/s) STANDARD IS 343m/s
 h = 1.5  # max pipe depth
-hg = 19.6
+hg = 19.6  # old = 18.9
 
 # size of arrays
 N = 400
 # frequency range (Hz)
-f1 = 10; f2 = 40000
+f1 = 5000; f2 = 30000
 fn = 5000
 frequency = np.arange(f1, f2, fn)  # for plotting
 ky = 0  # k should be in (1/mm)
@@ -135,7 +135,7 @@ def dispersion_plot():
     K0, THETA = np.meshgrid(k0, thetas)
     KX = K0 * np.sin(THETA)  # kx is now NxN
 
-    # list of modes (not repeating) range [-3,3] for m1 and m2
+    # list of modes (not repeating) range [-2,2] for m1 and m2
     size = 3
     modes = [(m1, m2) for m1 in range(-size+1, size) for m2 in range(-size+1, size)]
     modes = list(dict.fromkeys(modes))
@@ -166,7 +166,7 @@ def amplitude_plot():
     N = 1800
     k0 = 2*np.pi/c * np.linspace(f1, f2, N)
 
-    # list of modes (not repeating) range [-3,3] for m1 and m2
+    # list of modes (not repeating) range [-2,2] for m1 and m2
     size = 3
     modes= [(m1, m2) for m1 in range(-size+1, size) for m2 in range(-size+1, size)]
     modes = list(dict.fromkeys(modes))
@@ -220,6 +220,7 @@ def dispersion_map():
     plt.show()
 
 ################################# calling #####################################
-# dispersion_plot()
-# amplitude_plot()
+if __name__ == '__main__':
 
+    # dispersion_plot()
+    amplitude_plot()

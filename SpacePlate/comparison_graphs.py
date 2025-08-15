@@ -47,7 +47,7 @@ def plot_amplitude(filename, plot=True):
     plot with other plotted data.'''
     data, columns = read_data(filename)
 
-    data_num = data[:,1]
+    data_num = data[:,2]
 
     plt.plot(data[:, 0], data_num, label='numerical', ls=':')
     if plot is True:
@@ -149,10 +149,11 @@ def plot_comparison(filename, expfile, backfile):
 
     ########################### numerical plotting ############################
     # for single angle sweep over frequency csv
-    plot_amplitude(filename, plot=False)
+    # plot_amplitude(filename, plot=False)
     
     # ==========================================================
-    # for parametric sweep data plotting
+    ############# for parametric sweep data plotting ########### 
+    # ==========================================================
     # data, columns = read_data(filename)
     
     # freqs = []
@@ -166,10 +167,10 @@ def plot_comparison(filename, expfile, backfile):
     # ==========================================================
 
     ########################### experimental plotting #########################
-    # from data_processing import plot1Damp
-    # freq, amp = plot1Damp(expfile, backfile)
+    from data_processing import plot1Damp
+    freq, amp = plot1Damp(expfile, backfile)
 
-    # plt.plot(freq, amp, label='experimental', ls='--')
+    plt.scatter(freq, amp, label='experimental', s=7, color='r')
 
     ############################### plot all ##################################
     plt.title(f'Amplitude of Transmission from Spaceplate')
@@ -222,27 +223,34 @@ def TAvsPA(TAfile, PAfile):
     plt.show()
 
 
-# filename_PA = "comsol_data/sp_df3dPA.csv"
-# filename_TA = "comsol_data/sp_df3dTA.csv"
+if __name__ == '__main__':
+    # filename_PA = "comsol_data/sp_df3dPA.csv"
+    # filename_TA = "comsol_data/sp_df3dTA.csv"
 
-filename_PA = "sp_finalgeom_PA.csv"
-filename_TA = "sp_finalgeom_TA.csv"
-# filename_TA = 'ta_newgeom2.csv'
+    filename_PA = "comsol_data/sp_finalgeom_PA.csv"
+    filename_TA = "comsol_data/sp_finalgeom_TA.csv"
 
-filename = 'sp_finalgeom_0degPA.csv'
+    filename_TA = "ta_newgeom_t5again.csv"
 
-expfile = "scan_sp23.npy"
-backfile = "scan_ns23.npy"
+    # filename_PA = 'comsol_data/sp_final_PA0.csv'
 
-#filename_df = "comsol_data/spaceplate_dspn4.csv"
-filename2 = "sp_finalgeom_t5TA.csv"
+    filename = 'comsol_data/sp_finalgeom_0degPA.csv'
 
-# TAvsPA(filename_TA, filename_PA)
+    expfile = "scan_data/scan_sp21.npy"
+    backfile = "scan_data/scan_ns21.npy"
 
-# plot_dispersion(filename_TA)
-#plot_dispersion(filename2)
-# import mm_dispersion
-# plot1d(filename)
-# plot1d(filename_df, DF=True)
+    filename2 = "sp_finalgeom_t5TA.csv"
+    filename3 = 'Ta-stillbad0.csv'
+    filename3 = 'Untitled2.csv'
 
-plot_comparison(filename, expfile, backfile)
+    # ************ plot comparison lossless/ w. losses **************
+    # TAvsPA(filename_TA, filename_PA)  
+
+    # ***************** plot dispersion relation ********************
+    plot_dispersion(filename_TA)
+
+    # ***************** plot transmission normal ********************
+    # plot1d(filename)
+
+    # ************** plot transmission comparision ******************
+    # plot_comparison(filename_PA, expfile, backfile)
